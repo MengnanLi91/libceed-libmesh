@@ -1,0 +1,13 @@
+{
+  "files.associations": {
+    "stdbool.h": "c",
+    "linear_implicit_system.h": "c",
+    "equation_systems.h": "c",
+    "stdio.h": "c",
+    "libmesh.h": "c",
+    "main.C": "cpp",
+    "exact_solution.C": "cpp",
+    "mesh_setup.C": "cpp",
+    "solver.C": "cpp"
+  }
+}
