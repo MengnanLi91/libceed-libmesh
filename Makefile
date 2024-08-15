@@ -5,9 +5,10 @@ ifeq (x$(METHOD),x)
 endif
 
 # Paths to libMesh and libCEED
-LIBMESH_DIR = "./libmesh"
-LIBCEED_DIR = "./libceed"
+LIBMESH_DIR = libmesh
+LIBCEED_DIR = libceed
 INCLUDE_DIR = include
+QFUNCION_DIR = qfunctions
 
 
 # installed libmesh location of libmesh-config script
@@ -28,21 +29,45 @@ libmesh_LIBS     := $(shell METHOD=$(METHOD) $(libmesh_config) --libs)
 CEED_FLAGS ?= -I$(LIBCEED_DIR)/include -O -g
 CEED_LIBS ?= -Wl,-rpath,$(abspath $(LIBCEED_DIR)/lib) -L$(LIBCEED_DIR)/lib -lceed -lm
 
+# Add the project's include directory to the CXXFLAGS
+libmesh_CXXFLAGS += -I$(INCLUDE_DIR)
+# Add the project's Qfunctions directory to the CXXFLAGS
+libmesh_CXXFLAGS += -I$(QFUNCION_DIR)
 
 # File management variables.
 SRC_DIR := src
-srcfiles 	:= $(wildcard *.C)
-opt_executables := $(patsubst %.C, %-opt, $(srcfiles))
+srcfiles 	:= $(wildcard $(SRC_DIR)/*.C)
+objfiles := $(patsubst $(SRC_DIR)/%.C, $(SRC_DIR)/%.o, $(srcfiles))
+#executables := $(patsubst $(SRC_DIR)/%.C, %, $(srcfiles))
 executables := main
 
-.PHONY: clean
 
-# How to build executables. If you have a source file called foo.cc,
-# type 'make foo' to build an executable from it.
-%: %.C
+.PHONY: all clean
+
+# Default target: build all executables
+all: $(executables)
+
+
+# Link object files to create the executable
+$(executables): $(objfiles)
+	@echo "Linking" $@
+	$(libmesh_CXX) -o $@-$(METHOD) $^  $(libmesh_LIBS) $(CEED_LIBS)
+
+# Compile source files to object files
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.C
 	@echo "Compiling" $<
-	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) $(CEED_LDFLAGS) $< -o $@-$(METHOD) $(libmesh_LIBS) $(libmesh_LDFLAGS) $(CEED_LIBS)
+	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) -c $< -o $@
 
-# File management rules.
+# Clean up the generated files
 clean:
-	@rm -f *~ $(opt_executables)
+	rm -f $(SRC_DIR)/*.o $(executables)-$(METHOD)
+
+# # How to build executables. If you have a source file called foo.cc,
+# # type 'make foo' to build an executable from it.
+# %: $(SRC_DIR)/%.C
+# 	@echo "Compiling" $<
+# 	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) $(CEED_LDFLAGS) $< -o $@-$(METHOD) $(libmesh_LIBS) $(libmesh_LDFLAGS) $(CEED_LIBS)
+
+# # File management rules.
+# clean:
+# 	@rm -f *~ $(opt_executables)
