@@ -25,73 +25,41 @@ AssemblySystem::AssemblySystem() : _fe(2, libMesh::FEType(libMesh::SECOND, libMe
 {
 }
 
-void AssemblySystem::assembleCEED(libMesh::EquationSystems &equation_systems, const std::string &system_name, CeedSetup &ceedsetup)
+void AssemblySystem::assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceedsetup)
 {
-    // It is a good idea to make sure we are assembling
-    // the proper system.
-    libmesh_assert_equal_to(system_name, "Poisson");
-
-    // Get a constant reference to the mesh object.
-    const MeshBase &mesh = equation_systems.get_mesh();
-
-    // The dimension that we are running
-    const unsigned int dim = mesh.mesh_dimension();
-
-    // Get a reference to the LinearImplicitSystem we are solving
-    LinearImplicitSystem &system = equation_systems.get_system<LinearImplicitSystem>("Poisson");
-
-    // A reference to the  DofMap object for this system.  The  DofMap
-    // object handles the index translation from node and element numbers
-    // to degree of freedom numbers.  We will talk more about the  DofMap
-    // in future examples.
-    const DofMap &dof_map = system.get_dof_map();
-    std::vector<dof_id_type> dof_indices;
-
-    // Get a constant reference to the Finite Element type
-    // for the first (and only) variable in the system.
-    FEType fe_type = dof_map.variable_type(0);
-
-    // A 5th order Gauss quadrature rule for numerical integration.
-    QGauss qrule(dim, FIFTH);
-
-    // Create libCEED vectors for the system solution and rhs
-    CeedData ceed_data = nullptr;
-    FEproblemData feproblem_data = nullptr;
-
-    feproblem_data->dim = dim;
-    feproblem_data->num_dofs = system.n_dofs();
-    feproblem_data->num_poly = static_cast<int>(fe_type.order);
-    feproblem_data->num_comp = system.n_components();
-    feproblem_data->num_qpts = qrule.n_points();
-    feproblem_data->quad_mode = CEED_GAUSS;
+    CeedInt dim = feproblem_data.dim;
 
     ceedsetup.createCeedBasis(feproblem_data);
     ceedsetup.getCartesianMeshSize(feproblem_data);
 
-    printf("Mesh size: nx = %" CeedInt_FMT, feproblem_data->num_xyz[0]);
+    printf("Mesh size: nx = %" CeedInt_FMT, feproblem_data.num_xyz[0]);
     if (dim > 1)
-        printf(", ny = %" CeedInt_FMT, feproblem_data->num_xyz[1]);
+        printf(", ny = %" CeedInt_FMT, feproblem_data.num_xyz[1]);
     if (dim > 2)
-        printf(", nz = %" CeedInt_FMT, feproblem_data->num_xyz[2]);
+        printf(", nz = %" CeedInt_FMT, feproblem_data.num_xyz[2]);
     printf("\n");
 
-    ceedsetup.buildCartesianRestriction(feproblem_data, system.n_components(), &feproblem_data->mesh_size, &ceed_data->elem_restr_x, NULL);
-    ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data->sol_size, NULL, &ceed_data->elem_restr_qd);
-    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data->sol_size, &ceed_data->elem_restr_u, NULL);
+    // CeedInt mesh_size, sol_size;
+    // CeedElemRestriction mesh_restriction, sol_restriction, q_data_restriction;
+    ceedsetup.buildCartesianRestriction(feproblem_data, feproblem_data.num_comp, &feproblem_data.mesh_size, &ceedsetup.elem_restr_x, NULL);
+    ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data.sol_size, NULL, &ceedsetup.elem_restr_qd);
+    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, NULL);
 
+    // feproblem_data.mesh_size = mesh_size;
+    // feproblem_data.sol_size = sol_size;
     // LCOV_EXCL_START
-    printf("Number of mesh nodes     : %" CeedInt_FMT "\n", feproblem_data->mesh_size / dim);
-    printf("Number of solution nodes : %" CeedInt_FMT "\n", feproblem_data->sol_size);
+    printf("Number of mesh nodes     : %" CeedInt_FMT "\n", feproblem_data.mesh_size / dim);
+    printf("Number of solution nodes : %" CeedInt_FMT "\n", feproblem_data.sol_size);
     // LCOV_EXCL_STOP
 
-    ceedsetup.SetCartesianMeshCoords(feproblem_data, ceed_data);
+    ceedsetup.SetCartesianMeshCoords(feproblem_data);
 
-    CeedScalar exact_surface_area = ceedsetup.TransformMeshCoords(feproblem_data, ceed_data);
+    CeedScalar exact_surface_area = ceedsetup.TransformMeshCoords(feproblem_data);
 
-    ceedsetup.setupQfunction(feproblem_data, ceed_data);
-    ceedsetup.setupOperator(feproblem_data, ceed_data);
+    ceedsetup.setupQfunction(feproblem_data);
+    ceedsetup.setupOperator(feproblem_data);
 
-    CeedScalar surface_area = ceedsetup.solve(feproblem_data, ceed_data);
+    CeedScalar surface_area = ceedsetup.solve(feproblem_data);
 
     printf("Exact mesh surface area    : % .14g\n", exact_surface_area);
     printf("Surface area error         : % .14g\n", surface_area - exact_surface_area);
@@ -119,7 +87,7 @@ void AssemblySystem::assembleFunc(libMesh::EquationSystems &equation_systems, co
     const unsigned int dim = mesh.mesh_dimension();
 
     // Get a reference to the LinearImplicitSystem we are solving
-    LinearImplicitSystem &system = equation_systems.get_system<LinearImplicitSystem>("Poisson");
+    LinearImplicitSystem &system = equation_systems.get_system<LinearSystem>("Poisson");
 
     // A reference to the  DofMap object for this system.  The  DofMap
     // object handles the index translation from node and element numbers

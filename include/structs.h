@@ -28,7 +28,7 @@ struct CeedData_
   CeedData_();
 };
 
-typedef struct FEproblemData_ *FEproblemData;
+typedef struct FEproblemData_ FEproblemData;
 struct FEproblemData_
 {
   CeedInt dim;

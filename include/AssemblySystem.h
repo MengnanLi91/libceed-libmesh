@@ -49,7 +49,7 @@ public:
   AssemblySystem();
 
   void assembleFunc(EquationSystems &equation_systems, const std::string &system_name);
-  void assembleCEED(libMesh::EquationSystems &equation_systems, const std::string &system_name, CeedSetup &ceedsetup);
+  void assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceedsetup);
 
 private:
   Real exact_solution(const Real x,

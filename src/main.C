@@ -40,17 +40,7 @@ int main(int argc, char **argv)
 
     possion_problem.solve();
 
-    possion_problem.printInfo();
-
-    // Create a basis
-    // CeedBasis basis;
-    // CeedInt P = 3; // Quadratic elements
-    // CeedInt Q = 4; // Number of quadrature points
-    // CeedBasisCreateTensorH1Lagrange(ceed, 2, 1, P, Q, CEED_GAUSS, &basis);
-
-    // // Clean up libCEED
-    // CeedBasisDestroy(&basis);
-    // CeedDestroy(&ceed);
+    // possion_problem.printInfo();
 
     return 0;
 }
