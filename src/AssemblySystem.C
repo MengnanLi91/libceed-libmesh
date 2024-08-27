@@ -12,6 +12,7 @@
 
 #include "AssemblySystem.h"
 #include "LinearSystem.h"
+#include "CeedUtils.h"
 
 void assemble_poisson_system(EquationSystems &es, const std::string &system_name)
 {
@@ -42,8 +43,8 @@ void AssemblySystem::assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceed
     // CeedInt mesh_size, sol_size;
     // CeedElemRestriction mesh_restriction, sol_restriction, q_data_restriction;
     ceedsetup.buildCartesianRestriction(feproblem_data, feproblem_data.num_comp, &feproblem_data.mesh_size, &ceedsetup.elem_restr_x, NULL);
-    ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data.sol_size, NULL, &ceedsetup.elem_restr_qd);
-    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, NULL);
+    // ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data.sol_size, NULL, &ceedsetup.elem_restr_qd);
+    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, &ceedsetup.elem_restr_qd);
 
     // feproblem_data.mesh_size = mesh_size;
     // feproblem_data.sol_size = sol_size;
@@ -54,15 +55,17 @@ void AssemblySystem::assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceed
 
     ceedsetup.SetCartesianMeshCoords(feproblem_data);
 
-    CeedScalar exact_surface_area = ceedsetup.TransformMeshCoords(feproblem_data);
+    CeedScalar exact_volume = ceedsetup.TransformMeshCoords(feproblem_data);
 
     ceedsetup.setupQfunction(feproblem_data);
     ceedsetup.setupOperator(feproblem_data);
 
     CeedScalar surface_area = ceedsetup.solve(feproblem_data);
 
-    printf("Exact mesh surface area    : % .14g\n", exact_surface_area);
-    printf("Surface area error         : % .14g\n", surface_area - exact_surface_area);
+    printf(" done.\n");
+    printf("Exact mesh volume    : % .14g\n", exact_volume);
+    printf("Computed mesh volume : % .14g\n", surface_area);
+    printf("Volume error         : % .14g\n", surface_area - exact_volume);
 }
 
 Real AssemblySystem::exact_solution(const Real x,

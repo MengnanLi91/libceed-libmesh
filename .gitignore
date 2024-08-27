@@ -1,4 +1,8 @@
 /back
 /libceed
 /libmesh
-/main-opt
+*-opt
+*.o
+*.json
+*-debug
+

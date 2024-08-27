@@ -25,8 +25,8 @@ int main(int argc, char **argv)
     CeedSetup ceed_setup(argv[1]);
 
     // Create and setup mesh using SetupMesh class
-    SetupMesh setup_mesh(init, 15);
-    setup_mesh.create_square_mesh(10); // 10x10 elements
+    SetupMesh setup_mesh(init, 2);
+    setup_mesh.create_square_mesh(100); // 10x10 elements
     setup_mesh.prepare_for_use();
 
     Mesh &mesh = setup_mesh.get_mesh();
@@ -39,8 +39,6 @@ int main(int argc, char **argv)
     possion_problem.initialSetup();
 
     possion_problem.solve();
-
-    // possion_problem.printInfo();
 
     return 0;
 }

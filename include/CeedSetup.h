@@ -58,12 +58,10 @@ private:
   CeedQFunction qf_apply;
   CeedOperator op_build;
   CeedOperator op_apply;
-  CeedOperator op_restrict;
   CeedVector q_data;
-  CeedVector x_ceed;
-  CeedVector y_ceed;
-  CeedInt q_data_size;
   CeedVector u;
   CeedVector v;
   CeedVector mesh_coords;
+  struct BuildContext build_ctx_data;
 };
+

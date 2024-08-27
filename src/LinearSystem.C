@@ -22,6 +22,7 @@ LinearSystem::LinearSystem(EquationSystems &es, const std::string &name, const u
 void LinearSystem::initialSetup()
 {
     addVariable("u", SECOND, LAGRANGE);
+    addVariable("v", SECOND, LAGRANGE);
     this->attach_assemble_function(assemble_poisson_system);
 }
 
@@ -35,19 +36,18 @@ void LinearSystem::solveSystem(const std::string &name, CeedSetup &ceedsetup)
 {
     AssemblySystem assembly_system;
     // Get the polynomial order
-    _feproblem_data.num_dofs = 256 * 1024; // this->n_dofs();
-    _feproblem_data.num_poly = 2;          // this->variable_type(0).order;
-    _feproblem_data.num_comp = 2;          // this->n_components();
+    _feproblem_data.num_dofs = this->n_dofs();
+    _feproblem_data.num_poly = this->variable_type(0).order;
+    _feproblem_data.num_comp = this->n_components();
     _feproblem_data.quad_mode = CEED_GAUSS;
     auto dim = _es.get_mesh().mesh_dimension();
-    _feproblem_data.dim = 2; // dim;
-                             // A 5th order Gauss quadrature rule for numerical integration.
-    QGauss qrule(dim, FIFTH);
-    _feproblem_data.num_qpts = 4; // this->variable_type(0).order + 2;
-                                  // qrule.n_points();
+    _feproblem_data.dim = dim;
+    _feproblem_data.num_qpts = this->variable_type(0).order + 2;
+    // qrule.n_points();
 
+    print_FEproblemData(_feproblem_data);
     assembly_system.assembleCEED(_feproblem_data, ceedsetup);
-    this->solve();
+    // this->solve();
 }
 
 void LinearSystem::printInfo()

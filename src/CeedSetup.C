@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <math.h>
 
-#include "../qfunctions/Diffusion.h"
+#include "../qfunctions/Mass.h"
+#include "CeedUtils.h"
 
 CeedSetup::CeedSetup(const char *resource)
 {
@@ -35,7 +36,7 @@ void CeedSetup::createCeedBasis(FEproblemData &feproblem_data)
 {
   CeedInt dim = feproblem_data.dim;
   CeedInt num_comp = feproblem_data.num_comp;
-  CeedInt poly_order = feproblem_data.num_poly;
+  CeedInt poly_order = feproblem_data.num_poly + 1;
   CeedInt num_qpts = feproblem_data.num_qpts;
   CeedQuadMode quad_mode = feproblem_data.quad_mode;
 
@@ -50,7 +51,7 @@ void CeedSetup::getCartesianMeshSize(FEproblemData &feproblem_data)
   // Use the approximate formula:
   //    prob_size ~ num_elem * degree^dim
   CeedInt prob_size = feproblem_data.num_dofs;
-  CeedInt degree = feproblem_data.num_poly - 1;
+  CeedInt degree = feproblem_data.num_poly;
   CeedInt dim = feproblem_data.dim;
   CeedInt num_elem = prob_size / CeedIntPow(degree, dim);
   CeedInt s = 0; // find s: num_elem/2 < 2^s <= num_elem
@@ -76,7 +77,7 @@ void CeedSetup::buildCartesianRestriction(FEproblemData &feproblem_data, CeedInt
                                           CeedElemRestriction *restriction, CeedElemRestriction *q_data_restriction)
 {
   CeedInt dim = feproblem_data.dim;
-  CeedInt p = feproblem_data.num_poly;
+  CeedInt p = feproblem_data.num_poly + 1;
   CeedInt num_qpts = feproblem_data.num_qpts;
   CeedInt num_nodes = CeedIntPow(p, dim);        // number of scalar nodes per element
   CeedInt elem_qpts = CeedIntPow(num_qpts, dim); // number of qpts per element
@@ -117,12 +118,13 @@ void CeedSetup::buildCartesianRestriction(FEproblemData &feproblem_data, CeedInt
   if (restriction)
     CeedElemRestrictionCreate(_ceed, num_elem, num_nodes, num_comp, scalar_size, num_comp * scalar_size, CEED_MEM_HOST, CEED_COPY_VALUES, el_nodes,
                               restriction);
-  free(el_nodes);
 
   if (q_data_restriction)
   {
     CeedElemRestrictionCreateStrided(_ceed, num_elem, elem_qpts, num_comp, num_comp * elem_qpts * num_elem, CEED_STRIDES_BACKEND, q_data_restriction);
   }
+
+  free(el_nodes);
 }
 
 void CeedSetup::SetCartesianMeshCoords(FEproblemData &feproblem_data)
@@ -130,9 +132,10 @@ void CeedSetup::SetCartesianMeshCoords(FEproblemData &feproblem_data)
   CeedInt dim = feproblem_data.dim;
   CeedInt mesh_size = feproblem_data.mesh_size;
 
+  // Create a CeedVector of the specified length (does not allocate memory)
   CeedVectorCreate(_ceed, mesh_size, &mesh_coords);
 
-  CeedInt p = feproblem_data.num_poly;
+  CeedInt p = feproblem_data.num_poly + 1;
   CeedInt nd[3], scalar_size = 1;
   for (CeedInt d = 0; d < dim; d++)
   {
@@ -140,6 +143,7 @@ void CeedSetup::SetCartesianMeshCoords(FEproblemData &feproblem_data)
     scalar_size *= nd[d];
   }
   CeedScalar *coords;
+  // Get write access to a CeedVector via the specified memory type.
   CeedVectorGetArrayWrite(mesh_coords, CEED_MEM_HOST, &coords);
   CeedScalar *nodes = static_cast<CeedScalar *>(malloc(sizeof(CeedScalar) * p));
   // The H1 basis uses Lobatto quadrature points as nodes.
@@ -162,6 +166,7 @@ void CeedSetup::SetCartesianMeshCoords(FEproblemData &feproblem_data)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
+#define M_PI_2 1.57079632679489661923
 #endif
 
 CeedScalar CeedSetup::TransformMeshCoords(FEproblemData &feproblem_data)
@@ -169,75 +174,87 @@ CeedScalar CeedSetup::TransformMeshCoords(FEproblemData &feproblem_data)
   CeedInt dim = feproblem_data.dim;
   CeedInt mesh_size = feproblem_data.mesh_size;
 
-  CeedScalar exact_surface_area = (dim == 1 ? 2 : dim == 2 ? 4
-                                                           : 6);
+  CeedScalar exact_volume;
   CeedScalar *coords;
-
   CeedVectorGetArray(mesh_coords, CEED_MEM_HOST, &coords);
-  for (CeedInt i = 0; i < mesh_size; i++)
+  if (dim == 1)
   {
-    // map [0,1] to [0,1] varying the mesh density
-    coords[i] = 0.5 + 1. / sqrt(3.) * sin((2. / 3.) * M_PI * (coords[i] - 0.5));
+    for (CeedInt i = 0; i < mesh_size; i++)
+    {
+      // map [0,1] to [0,1] varying the mesh density
+      coords[i] = 0.5 + 1. / sqrt(3.) * sin((2. / 3.) * M_PI * (coords[i] - 0.5));
+    }
+    exact_volume = 1.;
+  }
+  else
+  {
+    CeedInt num_nodes = mesh_size / dim;
+    for (CeedInt i = 0; i < num_nodes; i++)
+    {
+      // map (x,y) from [0,1]x[0,1] to the quarter annulus with polar
+      // coordinates, (r,phi) in [1,2]x[0,pi/2] with area = 3/4*pi
+      CeedScalar u = coords[i], v = coords[i + num_nodes];
+      u = 1. + u;
+      v = M_PI_2 * v;
+      coords[i] = u * cos(v);
+      coords[i + num_nodes] = u * sin(v);
+    }
+    exact_volume = 3. / 4. * M_PI;
   }
   CeedVectorRestoreArray(mesh_coords, &coords);
-
-  return exact_surface_area;
+  return exact_volume;
 }
 
 void CeedSetup::setupQfunction(FEproblemData &feproblem_data)
 {
   CeedInt num_comp_x = feproblem_data.num_comp;
   CeedInt dim = feproblem_data.dim;
-  // Context data to be passed to the 'build_diff' QFunction.
-  struct BuildContext build_ctx_data;
+  // Context data to be passed to the 'build_mass' QFunction.
   build_ctx_data.dim = build_ctx_data.space_dim = dim;
   CeedQFunctionContextCreate(_ceed, &build_ctx);
   CeedQFunctionContextSetData(build_ctx, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(build_ctx_data), &build_ctx_data);
 
-  // Create the QFunction that builds the diffusion operator (i.e. computes its quadrature data) and set its context data.
+  // Create the QFunction that builds the mass operator (i.e. computes its quadrature data) and set its context data.
 
   // This creates the QFunction directly.
-  CeedQFunctionCreateInterior(_ceed, 1, build_diff, build_diff_loc, &qf_build);
+  CeedQFunctionCreateInterior(_ceed, 1, build_mass, build_mass_loc, &qf_build);
   CeedQFunctionAddInput(qf_build, "dx", num_comp_x * dim, CEED_EVAL_GRAD);
   CeedQFunctionAddInput(qf_build, "weights", 1, CEED_EVAL_WEIGHT);
-  CeedQFunctionAddOutput(qf_build, "qdata", dim * (dim + 1) / 2, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_build, "qdata", 1, CEED_EVAL_NONE);
   CeedQFunctionSetContext(qf_build, build_ctx);
 }
 
 void CeedSetup::setupOperator(FEproblemData &feproblem_data)
 {
-  // Create the operator that builds the quadrature data for the diffusion operator.
+  // verifyQFunctionContext(build_ctx);
+  //  Create the operator that builds the quadrature data for the mass operator.
 
   CeedOperatorCreate(_ceed, qf_build, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_build);
   CeedOperatorSetField(op_build, "dx", elem_restr_x, _mesh_basis, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_build, "weights", CEED_ELEMRESTRICTION_NONE, _mesh_basis, CEED_VECTOR_NONE);
   CeedOperatorSetField(op_build, "qdata", elem_restr_qd, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE);
 
-  // Verify the setup of the operator
-  printf("Setting up operator op_build with mesh_restriction, mesh_basis, and q_data_restriction\n");
-  CeedOperatorView(op_build, stdout);
+  // Compute the quadrature data for the mass operator.
+  CeedInt dim = feproblem_data.dim;
+  CeedInt elem_qpts = CeedIntPow(feproblem_data.num_qpts, dim);
+  CeedInt num_elem = 1;
+  for (CeedInt d = 0; d < dim; d++)
+    num_elem *= feproblem_data.num_xyz[d];
+  CeedVectorCreate(_ceed, num_elem * elem_qpts, &q_data);
 
-  // Compute the quadrature data for the diffusion operator.
-CeedInt dim = feproblem_data.dim;
-CeedInt elem_qpts = CeedIntPow(feproblem_data.num_qpts, dim);
-CeedInt num_elem = 1;
-for (CeedInt d = 0; d < dim; d++)
-  num_elem *= feproblem_data.num_xyz[d];
-CeedVectorCreate(_ceed, num_elem * elem_qpts * dim * (dim + 1) / 2, &q_data);
-CeedOperatorApply(op_build, mesh_coords, q_data, CEED_REQUEST_IMMEDIATE);
+  CeedOperatorApply(op_build, mesh_coords, q_data, CEED_REQUEST_IMMEDIATE);
 
-// Create the QFunction that defines the action of the diffusion operator.
-CeedQFunctionCreateInterior(_ceed, 1, apply_diff, apply_diff_loc, &qf_apply);
-CeedQFunctionAddInput(qf_apply, "du", dim, CEED_EVAL_GRAD);
-CeedQFunctionAddInput(qf_apply, "qdata", dim * (dim + 1) / 2, CEED_EVAL_NONE);
-CeedQFunctionAddOutput(qf_apply, "dv", dim, CEED_EVAL_GRAD);
-CeedQFunctionSetContext(qf_apply, build_ctx);
+  // Create the QFunction that defines the action of the diffusion operator.
+  CeedQFunctionCreateInterior(_ceed, 1, apply_mass, build_mass_loc, &qf_apply);
+  CeedQFunctionAddInput(qf_apply, "u", 1, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(qf_apply, "qdata", 1, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_apply, "v", 1, CEED_EVAL_INTERP);
 
-// Create the diffusion operator.
-CeedOperatorCreate(_ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
-CeedOperatorSetField(op_apply, "du", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_apply, "qdata", elem_restr_qd, CEED_BASIS_NONE, q_data);
-CeedOperatorSetField(op_apply, "dv", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
+  // Create the mass operator.
+  CeedOperatorCreate(_ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
+  CeedOperatorSetField(op_apply, "u", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_apply, "qdata", elem_restr_qd, CEED_BASIS_NONE, q_data);
+  CeedOperatorSetField(op_apply, "v", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
 }
 
 CeedScalar CeedSetup::solve(FEproblemData &feproblem_data)
@@ -247,40 +264,22 @@ CeedScalar CeedSetup::solve(FEproblemData &feproblem_data)
   CeedInt dim = feproblem_data.dim;
   CeedInt sol_size = feproblem_data.sol_size;
 
-  CeedVectorCreate(_ceed, feproblem_data.sol_size, &u);
-  CeedVectorCreate(_ceed, feproblem_data.sol_size, &v);
-  // Initialize 'u' with sum of coordinates, x+y+z.
-  {
-    CeedScalar *u_array;
-    const CeedScalar *x_array;
-    CeedVectorGetArrayWrite(u, CEED_MEM_HOST, &u_array);
-    CeedVectorGetArrayRead(mesh_coords, CEED_MEM_HOST, &x_array);
-    for (CeedInt i = 0; i < feproblem_data.sol_size; i++)
-    {
-      u_array[i] = 0;
-      for (CeedInt d = 0; d < dim; d++)
-        u_array[i] += x_array[i + d * sol_size];
-    }
-    CeedVectorRestoreArray(u, &u_array);
-    CeedVectorRestoreArrayRead(mesh_coords, &x_array);
-  }
+  CeedVectorCreate(_ceed, sol_size, &u);
+  CeedVectorCreate(_ceed, sol_size, &v);
+  // Initialize 'u' with ones.
+  CeedVectorSetValue(u, 1.0);
 
   // Compute the mesh surface area using the diff operator: surface_area = 1^T \cdot abs( K \cdot x).
   CeedOperatorApply(op_apply, u, v, CEED_REQUEST_IMMEDIATE);
 
-  // Compute and print the sum of the entries of 'v' giving the mesh surface area.
-  CeedScalar surface_area = 0.;
+  // Compute and print the sum of the entries of 'v' giving the mesh volume.
+  CeedScalar volume = 0.;
   {
     const CeedScalar *v_array;
     CeedVectorGetArrayRead(v, CEED_MEM_HOST, &v_array);
     for (CeedInt i = 0; i < sol_size; i++)
-      surface_area += fabs(v_array[i]);
+      volume += v_array[i];
     CeedVectorRestoreArrayRead(v, &v_array);
   }
-  // LCOV_EXCL_START
-  printf(" done.\n");
-  printf("Computed mesh surface area : % .14g\n", surface_area);
-  // LCOV_EXCL_STOP
-
-  return surface_area;
+  return volume;
 }

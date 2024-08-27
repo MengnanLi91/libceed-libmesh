@@ -8,13 +8,8 @@ using namespace libMesh;
 
 class LinearSystem;
 
-// Define the static member outside the class
-// AssemblySystem *AssemblerContext::assembler_instance = nullptr;
-
 ProblemBase::ProblemBase(Mesh &mesh, const std::vector<std::string> &system_names, CeedSetup &ceed_setup) : _mesh(mesh), _ln_sys_names(system_names), _num_ln_sys(_ln_sys_names.size()), _ln_sys(_num_ln_sys, nullptr), _ceed_setup(ceed_setup)
 {
-  // Store a pointer to the assembler in the context
-  // AssemblerContext::assembler_instance = &_assembler;
 
   _es = std::make_shared<EquationSystems>(_mesh);
   libmesh_assert_msg(_num_ln_sys, "should have at least one system to solve");
@@ -34,9 +29,7 @@ void ProblemBase::initialSetup()
   {
     auto &ln = _es->add_system<LinearSystem>(name);
     FEType fe_type(SECOND, LAGRANGE);
-    // ln.add_variable(name, fe_type);
-    // ln.addVariable(name, SECOND, LAGRANGE);
-    // ln.attach_assemble_function(assemble_poisson_system);
+
     ln.initialSetup();
   }
   std::cout << "Number of systems after adding: " << _es->n_systems() << std::endl;
