@@ -6,7 +6,7 @@ endif
 
 # Paths to libMesh and libCEED
 LIBMESH_DIR = libmesh
-LIBCEED_DIR = libceed
+LIBCEED_DIR = libCEED
 INCLUDE_DIR = include
 QFUNCION_DIR = qfunctions
 

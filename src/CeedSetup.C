@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "../qfunctions/Mass.h"
+#include "../qfunctions/Diffusion.h"
 #include "CeedUtils.h"
 
 CeedSetup::CeedSetup(const char *resource)
@@ -205,6 +206,26 @@ CeedScalar CeedSetup::TransformMeshCoords(FEproblemData &feproblem_data)
   return exact_volume;
 }
 
+CeedScalar CeedSetup::ComputeExactSurface(FEproblemData &feproblem_data)
+{
+  CeedInt dim = feproblem_data.dim;
+  CeedInt mesh_size = feproblem_data.mesh_size;
+
+  CeedScalar exact_surface_area = (dim == 1 ? 2 : dim == 2 ? 4
+                                                           : 6);
+  CeedScalar *coords;
+
+  CeedVectorGetArray(mesh_coords, CEED_MEM_HOST, &coords);
+  for (CeedInt i = 0; i < mesh_size; i++)
+  {
+    // map [0,1] to [0,1] varying the mesh density
+    coords[i] = 0.5 + 1. / sqrt(3.) * sin((2. / 3.) * M_PI * (coords[i] - 0.5));
+  }
+  CeedVectorRestoreArray(mesh_coords, &coords);
+
+  return exact_surface_area;
+}
+
 void CeedSetup::setupQfunction(FEproblemData &feproblem_data)
 {
   CeedInt num_comp_x = feproblem_data.num_comp;
@@ -221,6 +242,25 @@ void CeedSetup::setupQfunction(FEproblemData &feproblem_data)
   CeedQFunctionAddInput(qf_build, "dx", num_comp_x * dim, CEED_EVAL_GRAD);
   CeedQFunctionAddInput(qf_build, "weights", 1, CEED_EVAL_WEIGHT);
   CeedQFunctionAddOutput(qf_build, "qdata", 1, CEED_EVAL_NONE);
+  CeedQFunctionSetContext(qf_build, build_ctx);
+}
+
+void CeedSetup::setupQfunctionSurface(FEproblemData &feproblem_data)
+{
+  CeedInt num_comp_x = feproblem_data.num_comp;
+  CeedInt dim = feproblem_data.dim;
+  // Context data to be passed to the 'build_mass' QFunction.
+  build_ctx_data.dim = build_ctx_data.space_dim = dim;
+  CeedQFunctionContextCreate(_ceed, &build_ctx);
+  CeedQFunctionContextSetData(build_ctx, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(build_ctx_data), &build_ctx_data);
+
+  // Create the QFunction that builds the mass operator (i.e. computes its quadrature data) and set its context data.
+
+  // This creates the QFunction directly.
+  CeedQFunctionCreateInterior(_ceed, 1, build_diff, build_mass_loc, &qf_build);
+  CeedQFunctionAddInput(qf_build, "dx", num_comp_x * dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_build, "weights", 1, CEED_EVAL_WEIGHT);
+  CeedQFunctionAddOutput(qf_build, "qdata", dim * (dim + 1) / 2, CEED_EVAL_NONE);
   CeedQFunctionSetContext(qf_build, build_ctx);
 }
 
@@ -257,6 +297,40 @@ void CeedSetup::setupOperator(FEproblemData &feproblem_data)
   CeedOperatorSetField(op_apply, "v", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
 }
 
+void CeedSetup::setupOperatorSurface(FEproblemData &feproblem_data)
+{
+  // verifyQFunctionContext(build_ctx);
+  //  Create the operator that builds the quadrature data for the mass operator.
+
+  CeedOperatorCreate(_ceed, qf_build, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_build);
+  CeedOperatorSetField(op_build, "dx", elem_restr_x, _mesh_basis, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_build, "weights", CEED_ELEMRESTRICTION_NONE, _mesh_basis, CEED_VECTOR_NONE);
+  CeedOperatorSetField(op_build, "qdata", elem_restr_qd, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE);
+
+  // Compute the quadrature data for the mass operator.
+  CeedInt dim = feproblem_data.dim;
+  CeedInt elem_qpts = CeedIntPow(feproblem_data.num_qpts, dim);
+  CeedInt num_elem = 1;
+  for (CeedInt d = 0; d < dim; d++)
+    num_elem *= feproblem_data.num_xyz[d];
+  CeedVectorCreate(_ceed, num_elem * elem_qpts * dim * (dim + 1) / 2, &q_data);
+
+  CeedOperatorApply(op_build, mesh_coords, q_data, CEED_REQUEST_IMMEDIATE);
+
+  // Create the QFunction that defines the action of the diffusion operator.
+  CeedQFunctionCreateInterior(_ceed, 1, apply_diff, apply_diff_loc, &qf_apply);
+  CeedQFunctionAddInput(qf_apply, "du", dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qf_apply, "qdata", dim * (dim + 1) / 2, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_apply, "dv", dim, CEED_EVAL_GRAD);
+  CeedQFunctionSetContext(qf_apply, build_ctx);
+
+  // Create the diffusion operator.
+  CeedOperatorCreate(_ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
+  CeedOperatorSetField(op_apply, "du", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_apply, "qdata", elem_restr_qd, CEED_BASIS_NONE, q_data);
+  CeedOperatorSetField(op_apply, "dv", elem_restr_u, _sol_basis, CEED_VECTOR_ACTIVE);
+}
+
 CeedScalar CeedSetup::solve(FEproblemData &feproblem_data)
 {
   // Create auxiliary solution-size vectors.
@@ -282,4 +356,44 @@ CeedScalar CeedSetup::solve(FEproblemData &feproblem_data)
     CeedVectorRestoreArrayRead(v, &v_array);
   }
   return volume;
+}
+
+CeedScalar CeedSetup::solveSurface(FEproblemData &feproblem_data)
+{
+  // Create auxiliary solution-size vectors.
+
+  CeedInt dim = feproblem_data.dim;
+  CeedInt sol_size = feproblem_data.sol_size;
+
+  CeedVectorCreate(_ceed, sol_size, &u);
+  CeedVectorCreate(_ceed, sol_size, &v);
+  // Initialize 'u' with ones.
+  {
+    CeedScalar *u_array;
+    const CeedScalar *x_array;
+    CeedVectorGetArrayWrite(u, CEED_MEM_HOST, &u_array);
+    CeedVectorGetArrayRead(mesh_coords, CEED_MEM_HOST, &x_array);
+    for (CeedInt i = 0; i < sol_size; i++)
+    {
+      u_array[i] = 0;
+      for (CeedInt d = 0; d < dim; d++)
+        u_array[i] += x_array[i + d * sol_size];
+    }
+    CeedVectorRestoreArray(u, &u_array);
+    CeedVectorRestoreArrayRead(mesh_coords, &x_array);
+  }
+
+  // Compute the mesh surface area using the diff operator: surface_area = 1^T \cdot abs( K \cdot x).
+  CeedOperatorApply(op_apply, u, v, CEED_REQUEST_IMMEDIATE);
+
+  // Compute and print the sum of the entries of 'v' giving the mesh surface area.
+  CeedScalar surface_area = 0.;
+  {
+    const CeedScalar *v_array;
+    CeedVectorGetArrayRead(v, CEED_MEM_HOST, &v_array);
+    for (CeedInt i = 0; i < sol_size; i++)
+      surface_area += fabs(v_array[i]);
+    CeedVectorRestoreArrayRead(v, &v_array);
+  }
+  return surface_area;
 }

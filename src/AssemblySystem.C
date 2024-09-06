@@ -40,14 +40,14 @@ void AssemblySystem::assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceed
         printf(", nz = %" CeedInt_FMT, feproblem_data.num_xyz[2]);
     printf("\n");
 
-    // CeedInt mesh_size, sol_size;
-    // CeedElemRestriction mesh_restriction, sol_restriction, q_data_restriction;
-    ceedsetup.buildCartesianRestriction(feproblem_data, feproblem_data.num_comp, &feproblem_data.mesh_size, &ceedsetup.elem_restr_x, NULL);
-    // ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data.sol_size, NULL, &ceedsetup.elem_restr_qd);
-    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, &ceedsetup.elem_restr_qd);
+    // volume example
+    // ceedsetup.buildCartesianRestriction(feproblem_data, feproblem_data.num_comp, &feproblem_data.mesh_size, &ceedsetup.elem_restr_x, NULL);
+    // ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, &ceedsetup.elem_restr_qd);
 
-    // feproblem_data.mesh_size = mesh_size;
-    // feproblem_data.sol_size = sol_size;
+    ceedsetup.buildCartesianRestriction(feproblem_data, feproblem_data.num_comp, &feproblem_data.mesh_size, &ceedsetup.elem_restr_x, NULL);
+    ceedsetup.buildCartesianRestriction(feproblem_data, dim * (dim + 1) / 2, &feproblem_data.sol_size, NULL, &ceedsetup.elem_restr_qd);
+    ceedsetup.buildCartesianRestriction(feproblem_data, 1, &feproblem_data.sol_size, &ceedsetup.elem_restr_u, NULL);
+
     // LCOV_EXCL_START
     printf("Number of mesh nodes     : %" CeedInt_FMT "\n", feproblem_data.mesh_size / dim);
     printf("Number of solution nodes : %" CeedInt_FMT "\n", feproblem_data.sol_size);
@@ -55,17 +55,22 @@ void AssemblySystem::assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceed
 
     ceedsetup.SetCartesianMeshCoords(feproblem_data);
 
-    CeedScalar exact_volume = ceedsetup.TransformMeshCoords(feproblem_data);
+    // volume example
+    // CeedScalar exact_volume = ceedsetup.TransformMeshCoords(feproblem_data);
+    CeedScalar exact_surface_area = ceedsetup.ComputeExactSurface(feproblem_data);
 
-    ceedsetup.setupQfunction(feproblem_data);
-    ceedsetup.setupOperator(feproblem_data);
+    // ceedsetup.setupQfunction(feproblem_data);
+    // ceedsetup.setupOperator(feproblem_data);
+    ceedsetup.setupQfunctionSurface(feproblem_data);
+    ceedsetup.setupOperatorSurface(feproblem_data);
 
-    CeedScalar surface_area = ceedsetup.solve(feproblem_data);
+    // CeedScalar volume = ceedsetup.solve(feproblem_data);
+    CeedScalar surface_area = ceedsetup.solveSurface(feproblem_data);
 
     printf(" done.\n");
-    printf("Exact mesh volume    : % .14g\n", exact_volume);
-    printf("Computed mesh volume : % .14g\n", surface_area);
-    printf("Volume error         : % .14g\n", surface_area - exact_volume);
+    printf("Exact mesh surface    : % .14g\n", exact_surface_area);
+    printf("Computed mesh surface : % .14g\n", surface_area);
+    printf("Volume error         : % .14g\n", surface_area - exact_surface_area);
 }
 
 Real AssemblySystem::exact_solution(const Real x,

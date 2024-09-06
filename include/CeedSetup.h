@@ -25,13 +25,18 @@ public:
   // Apply a transformation to the mesh.
   CeedScalar TransformMeshCoords(FEproblemData &feproblem_data);
 
+  CeedScalar ComputeExactSurface(FEproblemData &feproblem_data);
+
   // Method to setup QFunction
   void setupQfunction(FEproblemData &feproblem_data);
+  void setupQfunctionSurface(FEproblemData &feproblem_data);
 
   // Method to setup Operator
   void setupOperator(FEproblemData &feproblem_data);
+  void setupOperatorSurface(FEproblemData &feproblem_data);
 
   CeedScalar solve(FEproblemData &feproblem_data);
+  CeedScalar solveSurface(FEproblemData &feproblem_data);
   // Getters for libCEED objects
   Ceed &getCeed()
   {
@@ -41,12 +46,6 @@ public:
   CeedElemRestriction elem_restr_x;
   CeedElemRestriction elem_restr_u;
   CeedElemRestriction elem_restr_qd;
-  // void setRestriction(CeedElemRestriction &mesh_restriction, CeedElemRestriction &sol_restriction, CeedElemRestriction &q_data_restriction)
-  // {
-  //   elem_restr_x = mesh_restriction;
-  //   elem_restr_u = sol_restriction;
-  //   elem_restr_qd = q_data_restriction;
-  // };
 
 private:
   Ceed _ceed;
