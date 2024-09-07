@@ -48,7 +48,7 @@ CEED_QFUNCTION(build_mass)
 
 /// libCEED Q-function for applying a mass operator
 CEED_QFUNCTION(apply_mass)
-(void *ctx, const CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out)
+(void */*ctx*/, const CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out)
 {
   const CeedScalar *u = in[0], *q_data = in[1];
   CeedScalar *v = out[0];

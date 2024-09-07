@@ -335,7 +335,6 @@ CeedScalar CeedSetup::solve(FEproblemData &feproblem_data)
 {
   // Create auxiliary solution-size vectors.
 
-  CeedInt dim = feproblem_data.dim;
   CeedInt sol_size = feproblem_data.sol_size;
 
   CeedVectorCreate(_ceed, sol_size, &u);

@@ -32,7 +32,7 @@ void LinearSystem::addVariable(const std::string &name, Order order, FEFamily fa
     this->add_variable(name, fe_type);
 }
 
-void LinearSystem::solveSystem(const std::string &name, CeedSetup &ceedsetup)
+void LinearSystem::solveSystem(const std::string &/*name*/, CeedSetup &ceedsetup)
 {
     AssemblySystem assembly_system;
     // Get the polynomial order
