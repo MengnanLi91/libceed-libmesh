@@ -26,7 +26,7 @@ libmesh_CPPFLAGS := $(shell METHOD=$(METHOD) $(libmesh_config) --cppflags)
 libmesh_CXXFLAGS := $(shell METHOD=$(METHOD) $(libmesh_config) --cxxflags)
 libmesh_LIBS     := $(shell METHOD=$(METHOD) $(libmesh_config) --libs)
 
-CEED_FLAGS ?= -I$(LIBCEED_DIR)/include -O -g
+CEED_FLAGS ?= -I$(LIBCEED_DIR)/include -g
 CEED_LIBS ?= -Wl,-rpath,$(abspath $(LIBCEED_DIR)/lib) -L$(LIBCEED_DIR)/lib -lceed -lm
 
 # Add the project's include directory to the CXXFLAGS
