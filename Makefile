@@ -38,6 +38,7 @@ libmesh_CXXFLAGS += -I$(QFUNCION_DIR)
 SRC_DIR := src
 srcfiles 	:= $(wildcard $(SRC_DIR)/*.C)
 objfiles := $(patsubst $(SRC_DIR)/%.C, $(SRC_DIR)/%.o, $(srcfiles))
+depfiles := $(objfiles:.o=.d)
 #executables := $(patsubst $(SRC_DIR)/%.C, %, $(srcfiles))
 executables := main
 
@@ -56,7 +57,9 @@ $(executables): $(objfiles)
 # Compile source files to object files
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.C
 	@echo "Compiling" $<
-	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) -c $< -o $@
+	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) -MMD -MP -c $< -o $@
+
+-include $(depfiles)
 
 # Clean up the generated files
 clean:
