@@ -17,20 +17,34 @@ CeedSetup::~CeedSetup()
 {
   // Destroy libCEED objects
   // Free dynamically allocated memory.
-  CeedVectorDestroy(&u);
-  CeedVectorDestroy(&v);
-  CeedVectorDestroy(&q_data);
-  CeedVectorDestroy(&mesh_coords);
-  CeedOperatorDestroy(&op_apply);
-  CeedQFunctionDestroy(&qf_apply);
-  CeedQFunctionContextDestroy(&build_ctx);
-  CeedOperatorDestroy(&op_build);
-  CeedQFunctionDestroy(&qf_build);
-  CeedElemRestrictionDestroy(&elem_restr_u);
-  CeedElemRestrictionDestroy(&elem_restr_x);
-  CeedElemRestrictionDestroy(&elem_restr_qd);
-  CeedBasisDestroy(&_mesh_basis);
-  CeedBasisDestroy(&_sol_basis);
+  if (u)
+    CeedVectorDestroy(&u);
+  if (v)
+    CeedVectorDestroy(&v);
+  if (q_data)
+    CeedVectorDestroy(&q_data);
+  if (mesh_coords)
+    CeedVectorDestroy(&mesh_coords);
+  if (op_apply)
+    CeedOperatorDestroy(&op_apply);
+  if (qf_apply)
+    CeedQFunctionDestroy(&qf_apply);
+  if (build_ctx)
+    CeedQFunctionContextDestroy(&build_ctx);
+  if (op_build)
+    CeedOperatorDestroy(&op_build);
+  if (qf_build)
+    CeedQFunctionDestroy(&qf_build);
+  if (elem_restr_u)
+    CeedElemRestrictionDestroy(&elem_restr_u);
+  if (elem_restr_x)
+    CeedElemRestrictionDestroy(&elem_restr_x);
+  if (elem_restr_qd)
+    CeedElemRestrictionDestroy(&elem_restr_qd);
+  if (_mesh_basis)
+    CeedBasisDestroy(&_mesh_basis);
+  if (_sol_basis)
+    CeedBasisDestroy(&_sol_basis);
 }
 
 void CeedSetup::createCeedBasis(FEproblemData &feproblem_data)
