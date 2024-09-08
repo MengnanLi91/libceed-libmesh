@@ -8,7 +8,7 @@
 // -----------------------------------------------------------------------------
 
 // libCEED data struct for level
-typedef struct CeedData_ *CeedData;
+typedef struct CeedData_ * CeedData;
 struct CeedData_
 {
   Ceed ceed;
