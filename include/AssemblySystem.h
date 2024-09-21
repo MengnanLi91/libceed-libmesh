@@ -41,20 +41,18 @@ using namespace libMesh;
 
 class CeedSetup;
 
-void assemble_poisson_system(EquationSystems &es, const std::string &system_name);
+void assemble_poisson_system(EquationSystems & es, const std::string & system_name);
 
 class AssemblySystem
 {
 public:
   AssemblySystem();
 
-  void assembleFunc(EquationSystems &equation_systems, const std::string &system_name);
-  void assembleCEED(FEproblemData &feproblem_data, CeedSetup &ceedsetup);
+  void assembleFunc(EquationSystems & equation_systems, const std::string & system_name);
+  void assembleCEED(FEproblemData & feproblem_data, CeedSetup & ceedsetup);
 
 private:
-  Real exact_solution(const Real x,
-                      const Real y,
-                      const Real z = 0.);
+  Real exact_solution(const Real x, const Real y, const Real z = 0.);
 
   FEProblembase _fe;
 };

@@ -3,7 +3,7 @@
 
 #include "structs.h"
 
-void print_FEproblemData(const FEproblemData_ &data);
+void print_FEproblemData(const FEproblemData_ & data);
 
 void printCeedVector(CeedVector vec);
 

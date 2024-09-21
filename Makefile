@@ -5,8 +5,8 @@ ifeq (x$(METHOD),x)
 endif
 
 # Paths to libMesh and libCEED
-LIBMESH_DIR = libmesh
-LIBCEED_DIR = libCEED
+LIBMESH_DIR ?= libmesh
+LIBCEED_DIR ?= libCEED
 INCLUDE_DIR = include
 QFUNCION_DIR = qfunctions
 
@@ -26,7 +26,7 @@ libmesh_CPPFLAGS := $(shell METHOD=$(METHOD) $(libmesh_config) --cppflags)
 libmesh_CXXFLAGS := $(shell METHOD=$(METHOD) $(libmesh_config) --cxxflags)
 libmesh_LIBS     := $(shell METHOD=$(METHOD) $(libmesh_config) --libs)
 
-CEED_FLAGS ?= -I$(LIBCEED_DIR)/include -O -g
+CEED_FLAGS ?= -I$(LIBCEED_DIR)/include -g
 CEED_LIBS ?= -Wl,-rpath,$(abspath $(LIBCEED_DIR)/lib) -L$(LIBCEED_DIR)/lib -lceed -lm
 
 # Add the project's include directory to the CXXFLAGS
@@ -38,6 +38,7 @@ libmesh_CXXFLAGS += -I$(QFUNCION_DIR)
 SRC_DIR := src
 srcfiles 	:= $(wildcard $(SRC_DIR)/*.C)
 objfiles := $(patsubst $(SRC_DIR)/%.C, $(SRC_DIR)/%.o, $(srcfiles))
+depfiles := $(objfiles:.o=.d)
 #executables := $(patsubst $(SRC_DIR)/%.C, %, $(srcfiles))
 executables := main
 
@@ -56,7 +57,9 @@ $(executables): $(objfiles)
 # Compile source files to object files
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.C
 	@echo "Compiling" $<
-	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) -c $< -o $@
+	$(libmesh_CXX) $(libmesh_INCLUDE) $(libmesh_CPPFLAGS) $(libmesh_CXXFLAGS) $(CEED_FLAGS) -MMD -MP -c $< -o $@
+
+-include $(depfiles)
 
 # Clean up the generated files
 clean:

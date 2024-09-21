@@ -3,6 +3,10 @@
 /libmesh
 *-opt
 *.o
+*.d
 *.json
 *-debug
-
+main-opt
+main-oprof
+main-devel
+main-dbg

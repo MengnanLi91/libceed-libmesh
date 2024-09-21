@@ -16,24 +16,25 @@ class LinearSystem;
 class ProblemBase
 {
 public:
-  ProblemBase(Mesh &mesh, const std::vector<std::string> &system_names, CeedSetup &ceed_setup);
+  ProblemBase(Mesh & mesh, const std::vector<std::string> & system_names, CeedSetup & ceed_setup);
 
   void initialSetup();
   void solve();
   void printInfo();
 
-  EquationSystems &es() { return *_es; }
+  EquationSystems & es() { return *_es; }
 
-  std::shared_ptr<LinearSystem> &getSystembyName(const std::string &name)
+  std::shared_ptr<LinearSystem> & getSystembyName(const std::string & name)
   {
 
-    libmesh_assert_msg(_ln_sys_name_to_num.find(name) != _ln_sys_name_to_num.end(), "The system name should have already be created and stored");
+    libmesh_assert_msg(_ln_sys_name_to_num.find(name) != _ln_sys_name_to_num.end(),
+                       "The system name should have already be created and stored");
 
     return _ln_sys[_ln_sys_name_to_num[name]];
   }
 
 protected:
-  Mesh &_mesh;
+  Mesh & _mesh;
   /// The nonlinear system names
   const std::vector<std::string> _ln_sys_names;
 
